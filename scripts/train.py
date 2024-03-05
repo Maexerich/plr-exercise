@@ -13,11 +13,23 @@ import wandb
 import optuna
 from optuna.trial import TrialState
 
-wandb.login() 
+wandb.login()
 
 DEVICE = None
 
+
 def train(args, model, device, train_loader, optimizer, epoch):
+    """
+    Function to train the model.
+
+    Args:
+    - args: argparse.ArgumentParser object, contains the command line arguments.
+    - model: torch.nn.Module object, the model to train.
+    - device: torch.device object, the device to use for training (CPU/GPU)
+    - train_loader: torch.utils.data.DataLoader object, the training data.
+    - optimizer: torch.optim.Optimizer object, the optimizer to use for training.
+    - epoch: int, the current epoch number.
+    """
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
 
@@ -43,6 +55,16 @@ def train(args, model, device, train_loader, optimizer, epoch):
 
 
 def test(model, device, test_loader, epoch, trial):
+    """
+    Function which tests the trained model on a test data set.
+
+    Args:
+    - model: torch.nn.Module object, the trained model.
+    - device: torch.device object, the device to use for testing (CPU/GPU).
+    - test_loader: torch.utils.data.DataLoader object, the test data.
+    - epoch: int, the current epoch number.
+    - trial: optuna.trial.Trial object, the current trial (optune).
+    """
     model.eval()
     test_loss = 0
     correct = 0
@@ -66,23 +88,6 @@ def test(model, device, test_loader, epoch, trial):
     wandb.log({"accuracy": 100.0 * correct / len(test_loader.dataset), "test_loss": test_loss})
     trial.report(100.0 * correct / len(test_loader.dataset), epoch)
     return 100.0 * correct / len(test_loader.dataset)
-
-# def objective(trial):
-#     lr = trial.suggest_float("lr", 1e-6, 1e-1, log=True)
-#     gamma = trial.suggest_float("gamma", 0.1, 0.9)
-#     epochs = trial.suggest_int("epochs", 1, 10)
-
-
-#     model = Net().to(DEVICE)
-#     optimizer = optim.Adam(model.parameters(), lr=lr)
-
-#     scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
-
-#     for epoch in range(epochs):
-#         train(args, model, DEVICE, train_loader, optimizer, epoch)
-#         accuracy = test(model, DEVICE, test_loader, epoch, trial)
-#         scheduler.step()
-
 
 
 def main():
@@ -132,22 +137,19 @@ def main():
     train_loader = torch.utils.data.DataLoader(dataset1, **train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
 
-    # model = Net().to(device)
-    # optimizer = optim.Adam(model.parameters(), lr=args.lr)
-
-    # scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
-    
     def objective(trial):
+        """
+        Objective function which is used to optimize hyperparameters using the optuna library.
+        """
         lr = trial.suggest_float("lr", 1e-6, 1e-1, log=True)
         gamma = trial.suggest_float("gamma", 0.1, 0.9)
         epochs = trial.suggest_int("epochs", 1, 3)
 
-        wandb.init(project="plr_exercise",
-                   config={"learning_rate": lr,
-                           "epochs": epochs,
-                           "gamma": gamma},
-                    name=f'Trial-{trial.number}',)
-
+        wandb.init(
+            project="plr_exercise",
+            config={"learning_rate": lr, "epochs": epochs, "gamma": gamma},
+            name=f"Trial-{trial.number}",
+        )
 
         model = Net().to(DEVICE)
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -168,9 +170,9 @@ def main():
             torch.save(model.state_dict(), "mnist_cnn.pt")
 
         wandb.finish()
-            
+
         return accuracy
-    
+
     study = optuna.create_study(direction="maximize", study_name="experiment3", storage="sqlite:///experiment3.db")
     study.optimize(objective, n_trials=5)
 
@@ -190,14 +192,6 @@ def main():
     print("  Params: ")
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
-    
-    # for epoch in range(args.epochs):
-    #     train(args, model, device, train_loader, optimizer, epoch)
-    #     accuracy = test(model, device, test_loader, epoch)
-    #     scheduler.step()
-
-    # if args.save_model:
-    #     torch.save(model.state_dict(), "mnist_cnn.pt")
 
 
 if __name__ == "__main__":
